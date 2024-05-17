@@ -105,11 +105,11 @@ type Transport struct {
 	// If true, responses returned from the cache will be given an extra header, X-From-Cache
 	MarkCachedResponses bool
 
-	// AroundRoundTrip is an optional func.
-	// If set, the Transport will call AroundRoundTrip at the start of RoundTrip
+	// Around is an optional func.
+	// If set, the Transport will call Around at the start of RoundTrip
 	// and defer the returned func until the end of RoundTrip.
 	// Typically used to implement a lock that is held for the duration of the RoundTrip.
-	AroundRoundTrip func(key string) func()
+	Around func(key string) func()
 }
 
 // varyMatches will return false unless all of the cached values for the headers listed in Vary
@@ -134,7 +134,7 @@ func varyMatches(cachedResp *http.Response, req *http.Request) bool {
 // will be returned.
 func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error) {
 	cacheKey := cacheKey(req)
-	if f := t.AroundRoundTrip; f != nil {
+	if f := t.Around; f != nil {
 		defer f(cacheKey)()
 	}
 	cacheable := (req.Method == "GET" || req.Method == "HEAD") && req.Header.Get("range") == ""
