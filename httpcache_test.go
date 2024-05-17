@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -432,7 +431,7 @@ func TestGetOnlyIfCachedHit(t *testing.T) {
 		if resp.Header.Get(XFromCache) != "" {
 			t.Fatal("XFromCache header isn't blank")
 		}
-		_, err = ioutil.ReadAll(resp.Body)
+		_, err = io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -549,7 +548,7 @@ func TestGetWithEtag(t *testing.T) {
 		if resp.Header.Get(XFromCache) != "" {
 			t.Fatal("XFromCache header isn't blank")
 		}
-		_, err = ioutil.ReadAll(resp.Body)
+		_, err = io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -589,7 +588,7 @@ func TestGetWithLastModified(t *testing.T) {
 		if resp.Header.Get(XFromCache) != "" {
 			t.Fatal("XFromCache header isn't blank")
 		}
-		_, err = ioutil.ReadAll(resp.Body)
+		_, err = io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -622,7 +621,7 @@ func TestGetWithVary(t *testing.T) {
 		if resp.Header.Get("Vary") != "Accept" {
 			t.Fatalf(`Vary header isn't "Accept": %v`, resp.Header.Get("Vary"))
 		}
-		_, err = ioutil.ReadAll(resp.Body)
+		_, err = io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -678,7 +677,7 @@ func TestGetWithDoubleVary(t *testing.T) {
 		if resp.Header.Get("Vary") == "" {
 			t.Fatalf(`Vary header is blank`)
 		}
-		_, err = ioutil.ReadAll(resp.Body)
+		_, err = io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -740,7 +739,7 @@ func TestGetWith2VaryHeaders(t *testing.T) {
 		if resp.Header.Get("Vary") == "" {
 			t.Fatalf(`Vary header is blank`)
 		}
-		_, err = ioutil.ReadAll(resp.Body)
+		_, err = io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -799,7 +798,7 @@ func TestGetWith2VaryHeaders(t *testing.T) {
 		if resp.Header.Get(XFromCache) != "" {
 			t.Fatal("XFromCache header isn't blank")
 		}
-		_, err = ioutil.ReadAll(resp.Body)
+		_, err = io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -832,7 +831,7 @@ func TestGetVaryUnused(t *testing.T) {
 		if resp.Header.Get("Vary") == "" {
 			t.Fatalf(`Vary header is blank`)
 		}
-		_, err = ioutil.ReadAll(resp.Body)
+		_, err = io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -863,7 +862,7 @@ func TestUpdateFields(t *testing.T) {
 		}
 		defer resp.Body.Close()
 		counter = resp.Header.Get("x-counter")
-		_, err = ioutil.ReadAll(resp.Body)
+		_, err = io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -899,7 +898,7 @@ func TestCachedErrorsKeepStatus(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer resp.Body.Close()
-		io.Copy(ioutil.Discard, resp.Body)
+		io.Copy(io.Discard, resp.Body)
 	}
 	{
 		resp, err := s.client.Do(req)
@@ -1203,7 +1202,7 @@ func TestStaleIfErrorRequest(t *testing.T) {
 				"Date":          []string{now.Format(time.RFC1123)},
 				"Cache-Control": []string{"no-cache"},
 			},
-			Body: ioutil.NopCloser(bytes.NewBuffer([]byte("some data"))),
+			Body: io.NopCloser(bytes.NewBuffer([]byte("some data"))),
 		},
 		err: nil,
 	}
@@ -1220,7 +1219,7 @@ func TestStaleIfErrorRequest(t *testing.T) {
 	if resp == nil {
 		t.Fatal("resp is nil")
 	}
-	_, err = ioutil.ReadAll(resp.Body)
+	_, err = io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1248,7 +1247,7 @@ func TestStaleIfErrorRequestLifetime(t *testing.T) {
 				"Date":          []string{now.Format(time.RFC1123)},
 				"Cache-Control": []string{"no-cache"},
 			},
-			Body: ioutil.NopCloser(bytes.NewBuffer([]byte("some data"))),
+			Body: io.NopCloser(bytes.NewBuffer([]byte("some data"))),
 		},
 		err: nil,
 	}
@@ -1265,7 +1264,7 @@ func TestStaleIfErrorRequestLifetime(t *testing.T) {
 	if resp == nil {
 		t.Fatal("resp is nil")
 	}
-	_, err = ioutil.ReadAll(resp.Body)
+	_, err = io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1311,7 +1310,7 @@ func TestStaleIfErrorResponse(t *testing.T) {
 				"Date":          []string{now.Format(time.RFC1123)},
 				"Cache-Control": []string{"no-cache, stale-if-error"},
 			},
-			Body: ioutil.NopCloser(bytes.NewBuffer([]byte("some data"))),
+			Body: io.NopCloser(bytes.NewBuffer([]byte("some data"))),
 		},
 		err: nil,
 	}
@@ -1327,7 +1326,7 @@ func TestStaleIfErrorResponse(t *testing.T) {
 	if resp == nil {
 		t.Fatal("resp is nil")
 	}
-	_, err = ioutil.ReadAll(resp.Body)
+	_, err = io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1355,7 +1354,7 @@ func TestStaleIfErrorResponseLifetime(t *testing.T) {
 				"Date":          []string{now.Format(time.RFC1123)},
 				"Cache-Control": []string{"no-cache, stale-if-error=100"},
 			},
-			Body: ioutil.NopCloser(bytes.NewBuffer([]byte("some data"))),
+			Body: io.NopCloser(bytes.NewBuffer([]byte("some data"))),
 		},
 		err: nil,
 	}
@@ -1371,7 +1370,7 @@ func TestStaleIfErrorResponseLifetime(t *testing.T) {
 	if resp == nil {
 		t.Fatal("resp is nil")
 	}
-	_, err = ioutil.ReadAll(resp.Body)
+	_, err = io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1409,7 +1408,7 @@ func TestStaleIfErrorKeepsStatus(t *testing.T) {
 				"Date":          []string{now.Format(time.RFC1123)},
 				"Cache-Control": []string{"no-cache"},
 			},
-			Body: ioutil.NopCloser(bytes.NewBuffer([]byte("some data"))),
+			Body: io.NopCloser(bytes.NewBuffer([]byte("some data"))),
 		},
 		err: nil,
 	}
@@ -1426,7 +1425,7 @@ func TestStaleIfErrorKeepsStatus(t *testing.T) {
 	if resp == nil {
 		t.Fatal("resp is nil")
 	}
-	_, err = ioutil.ReadAll(resp.Body)
+	_, err = io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}

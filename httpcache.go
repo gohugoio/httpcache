@@ -3,7 +3,6 @@
 //
 // It is only suitable for use as a 'private' cache (i.e. for a web-browser or an API-client
 // and not for a shared proxy).
-//
 package httpcache
 
 import (
@@ -11,7 +10,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	"strings"
@@ -234,7 +232,7 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 				R: resp.Body,
 				OnEOF: func(r io.Reader) {
 					resp := *resp
-					resp.Body = ioutil.NopCloser(r)
+					resp.Body = io.NopCloser(r)
 					respBytes, err := httputil.DumpResponse(&resp, true)
 					if err == nil {
 						t.Cache.Set(cacheKey, respBytes)
@@ -287,7 +285,7 @@ var clock timer = &realClock{}
 // transparent indicates the response should not be used to fulfil the request
 //
 // Because this is only a private cache, 'public' and 'private' in cache-control aren't
-// signficant. Similarly, smax-age isn't used.
+// significant. Similarly, smax-age isn't used.
 func getFreshness(respHeaders, reqHeaders http.Header) (freshness int) {
 	respCacheControl := parseCacheControl(respHeaders)
 	reqCacheControl := parseCacheControl(reqHeaders)
