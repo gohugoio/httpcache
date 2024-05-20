@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -1324,4 +1325,51 @@ func doMethod(t testing.TB, method string, p string, headers map[string]string) 
 	}
 
 	return buf.String(), resp
+}
+
+// newMemoryCacheTransport returns a new Transport using the in-memory cache implementation
+func newMemoryCacheTransport() *Transport {
+	c := newMemoryCache()
+	t := &Transport{Cache: c}
+	return t
+}
+
+// memoryCache is an implemtation of Cache that stores responses in an in-memory map.
+type memoryCache struct {
+	mu    sync.RWMutex
+	items map[string][]byte
+}
+
+// newMemoryCache returns a new Cache that will store items in an in-memory map
+func newMemoryCache() *memoryCache {
+	c := &memoryCache{items: map[string][]byte{}}
+	return c
+}
+
+func (c *memoryCache) Size() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.items)
+}
+
+// Get returns the []byte representation of the response and true if present, false if not
+func (c *memoryCache) Get(key string) (resp []byte, ok bool) {
+	c.mu.RLock()
+	resp, ok = c.items[key]
+	c.mu.RUnlock()
+	return resp, ok
+}
+
+// Set saves response resp to the cache with key
+func (c *memoryCache) Set(key string, resp []byte) {
+	c.mu.Lock()
+	c.items[key] = resp
+	c.mu.Unlock()
+}
+
+// Delete removes key from the cache
+func (c *memoryCache) Delete(key string) {
+	c.mu.Lock()
+	delete(c.items, key)
+	c.mu.Unlock()
 }

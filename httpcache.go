@@ -16,7 +16,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -76,46 +75,6 @@ func (t *Transport) cachedResponse(req *http.Request) (resp *http.Response, err 
 
 	b := bytes.NewBuffer(cachedVal)
 	return http.ReadResponse(bufio.NewReader(b), req)
-}
-
-// memoryCache is an implemtation of Cache that stores responses in an in-memory map.
-type memoryCache struct {
-	mu    sync.RWMutex
-	items map[string][]byte
-}
-
-func (c *memoryCache) Size() int {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return len(c.items)
-}
-
-// Get returns the []byte representation of the response and true if present, false if not
-func (c *memoryCache) Get(key string) (resp []byte, ok bool) {
-	c.mu.RLock()
-	resp, ok = c.items[key]
-	c.mu.RUnlock()
-	return resp, ok
-}
-
-// Set saves response resp to the cache with key
-func (c *memoryCache) Set(key string, resp []byte) {
-	c.mu.Lock()
-	c.items[key] = resp
-	c.mu.Unlock()
-}
-
-// Delete removes key from the cache
-func (c *memoryCache) Delete(key string) {
-	c.mu.Lock()
-	delete(c.items, key)
-	c.mu.Unlock()
-}
-
-// newMemoryCache returns a new Cache that will store items in an in-memory map
-func newMemoryCache() *memoryCache {
-	c := &memoryCache{items: map[string][]byte{}}
-	return c
 }
 
 // Transport is an implementation of http.RoundTripper that will return values from a cache
@@ -616,11 +575,4 @@ func (r *cachingReadCloser) Read(p []byte) (n int, err error) {
 
 func (r *cachingReadCloser) Close() error {
 	return r.R.Close()
-}
-
-// newMemoryCacheTransport returns a new Transport using the in-memory cache implementation
-func newMemoryCacheTransport() *Transport {
-	c := newMemoryCache()
-	t := &Transport{Cache: c}
-	return t
 }
