@@ -224,7 +224,7 @@ func TestEnableETagPair(t *testing.T) {
 		_, resp := doMethod(t, "GET", "/etag", nil)
 		c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
 		c.Assert(resp.Header.Get(XETag1), qt.Equals, "124567")
-		c.Assert(resp.Header.Get(XETag2), qt.Equals, "")
+		c.Assert(resp.Header.Get(XETag2), qt.Equals, "124567")
 	}
 	{
 		_, resp := doMethod(t, "GET", "/etag", nil)
@@ -238,7 +238,7 @@ func TestEnableETagPair(t *testing.T) {
 		_, resp := doMethod(t, "GET", "/helloheaderasbody", map[string]string{"Hello": "world1"})
 		c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
 		c.Assert(resp.Header.Get(XETag1), qt.Equals, "48b21a691481958c34cc165011bdb9bc")
-		c.Assert(resp.Header.Get(XETag2), qt.Equals, "")
+		c.Assert(resp.Header.Get(XETag2), qt.Equals, "48b21a691481958c34cc165011bdb9bc")
 	}
 	{
 		_, resp := doMethod(t, "GET", "/helloheaderasbody", map[string]string{"Hello": "world2"})
