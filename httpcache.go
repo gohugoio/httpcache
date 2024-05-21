@@ -242,7 +242,11 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 			if t.EnableETagPair {
 				if etag := resp.Header.Get("etag"); etag != "" {
 					resp.Header.Set(XETag1, etag)
-					resp.Header.Set(XETag2, cachedXEtag)
+					etag2 := cachedXEtag
+					if etag2 == "" {
+						etag2 = etag
+					}
+					resp.Header.Set(XETag2, etag2)
 				} else {
 					etagHash = md5.New()
 					r = struct {
@@ -261,8 +265,11 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 					if etagHash != nil {
 						md5Str := hex.EncodeToString(etagHash.Sum(nil))
 						resp.Header.Set(XETag1, md5Str)
-						resp.Header.Set(XETag2, cachedXEtag)
-
+						etag2 := cachedXEtag
+						if etag2 == "" {
+							etag2 = md5Str
+						}
+						resp.Header.Set(XETag2, etag2)
 					}
 					resp := *resp
 					resp.Body = io.NopCloser(r)
