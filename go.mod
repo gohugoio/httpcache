@@ -1,6 +1,6 @@
 module github.com/gohugoio/httpcache
 
-go 1.22.2
+go 1.20
 
 require github.com/frankban/quicktest v1.14.6
 
