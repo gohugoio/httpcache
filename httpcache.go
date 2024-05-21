@@ -101,6 +101,10 @@ type Transport struct {
 	// An empty string signals that this request should not be cached.
 	CacheKey func(req *http.Request) string
 
+	// AlwaysUseCachedResponse is an optional func that when it returns true
+	// a successful response from the cache will be returned without connecting to the server.
+	AlwaysUseCachedResponse func(req *http.Request, key string) bool
+
 	// Around is an optional func.
 	// If set, the Transport will call Around at the start of RoundTrip
 	// and defer the returned func until the end of RoundTrip.
@@ -141,6 +145,9 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 	var cachedResp *http.Response
 	if cacheable {
 		cachedResp, err = t.cachedResponse(req)
+		if err == nil && cachedResp != nil && t.AlwaysUseCachedResponse != nil && t.AlwaysUseCachedResponse(req, cacheKey) {
+			return cachedResp, nil
+		}
 	} else {
 		// Need to invalidate an existing value
 		t.Cache.Delete(cacheKey)
