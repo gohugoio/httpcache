@@ -178,6 +178,8 @@ func cacheSize() int {
 func resetTest() {
 	s.transport.Cache = newMemoryCache()
 	s.transport.CacheKey = nil
+	s.transport.AlwaysUseCachedResponse = nil
+	s.transport.ShouldCache = nil
 	s.transport.EnableETagPair = false
 	s.transport.MarkCachedResponses = false
 	clock = &realClock{}
@@ -266,6 +268,30 @@ func TestAlwaysUseCachedResponse(t *testing.T) {
 	{
 		s, _ := doMethod(t, "GET", "/helloheaderasbody", map[string]string{"Hello": "world3"})
 		c.Assert(s, qt.Equals, "world3")
+	}
+}
+
+func TestShouldCache(t *testing.T) {
+	resetTest()
+	c := qt.New(t)
+	s.transport.AlwaysUseCachedResponse = func(req *http.Request, key string) bool {
+		return true
+	}
+
+	s.transport.ShouldCache = func(req *http.Request, resp *http.Response, key string) bool {
+		return req.Header.Get("Hello") == "world2"
+	}
+	{
+		s, _ := doMethod(t, "GET", "/helloheaderasbody", map[string]string{"Hello": "world1"})
+		c.Assert(s, qt.Equals, "world1")
+	}
+	{
+		s, _ := doMethod(t, "GET", "/helloheaderasbody", map[string]string{"Hello": "world2"})
+		c.Assert(s, qt.Equals, "world2")
+	}
+	{
+		s, _ := doMethod(t, "GET", "/helloheaderasbody", map[string]string{"Hello": "world3"})
+		c.Assert(s, qt.Equals, "world2")
 	}
 }
 
