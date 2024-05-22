@@ -105,6 +105,9 @@ type Transport struct {
 	// a successful response from the cache will be returned without connecting to the server.
 	AlwaysUseCachedResponse func(req *http.Request, key string) bool
 
+	// ShouldCache is an optional func that when it returns false, the response will not be cached.
+	ShouldCache func(req *http.Request, resp *http.Response, key string) bool
+
 	// Around is an optional func.
 	// If set, the Transport will call Around at the start of RoundTrip
 	// and defer the returned func until the end of RoundTrip.
@@ -228,7 +231,7 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 		}
 	}
 
-	if cacheable && canStore(parseCacheControl(req.Header), parseCacheControl(resp.Header)) {
+	if cacheable && (t.ShouldCache == nil || t.ShouldCache(req, resp, cacheKey)) && canStore(parseCacheControl(req.Header), parseCacheControl(resp.Header)) {
 		for _, varyKey := range headerAllCommaSepValues(resp.Header, "vary") {
 			varyKey = http.CanonicalHeaderKey(varyKey)
 			fakeHeader := "X-Varied-" + varyKey
