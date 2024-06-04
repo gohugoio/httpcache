@@ -33,13 +33,16 @@ const (
 	XETag1 = xEtags + "1"
 
 	// XETag2 is the key for the second eTag value.
+	// Note that in the cache, XETag1 and XETag2 will always be the same.
+	// In the Response returned from Response, XETag1 will be the cached value (old) and
+	// XETag2 will be the eTag value from the server (new).
 	XETag2 = xEtags + "2"
 )
 
 // A Cache interface is used by the Transport to store and retrieve responses.
 type Cache interface {
 	// Get returns the []byte representation of a cached response and a bool
-	// set to true if the value isn't empty
+	// set to set to false if the key is not found or the value is stale.
 	Get(key string) (responseBytes []byte, ok bool)
 	// Set stores the []byte representation of a response against a key
 	Set(key string, responseBytes []byte)
@@ -65,16 +68,19 @@ func (t *Transport) cacheKey(req *http.Request) string {
 	}
 }
 
-// cachedResponse returns the cached http.Response for req if present, and nil
-// otherwise.
-func (t *Transport) cachedResponse(req *http.Request) (resp *http.Response, err error) {
+// cachedResponse returns the cached http.Response for req if present and
+// a bool set to false if the value is stale.
+func (t *Transport) cachedResponse(req *http.Request) (*http.Response, bool, error) {
 	cachedVal, ok := t.Cache.Get(t.cacheKey(req))
-	if !ok {
-		return
+	if !ok && len(cachedVal) == 0 {
+		return nil, false, nil
 	}
-
 	b := bytes.NewBuffer(cachedVal)
-	return http.ReadResponse(bufio.NewReader(b), req)
+	resp, err := http.ReadResponse(bufio.NewReader(b), req)
+	if err != nil {
+		return nil, false, err
+	}
+	return resp, ok, nil
 }
 
 // Transport is an implementation of http.RoundTripper that will return values from a cache
@@ -145,10 +151,13 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 
 	cacheable := cacheKey != ""
 
-	var cachedResp *http.Response
+	var (
+		cachedResp    *http.Response
+		hasCachedResp bool
+	)
 	if cacheable {
-		cachedResp, err = t.cachedResponse(req)
-		if err == nil && cachedResp != nil && t.AlwaysUseCachedResponse != nil && t.AlwaysUseCachedResponse(req, cacheKey) {
+		cachedResp, hasCachedResp, err = t.cachedResponse(req)
+		if err == nil && hasCachedResp && t.AlwaysUseCachedResponse != nil && t.AlwaysUseCachedResponse(req, cacheKey) {
 			return cachedResp, nil
 		}
 	} else {
@@ -161,12 +170,15 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 		transport = http.DefaultTransport
 	}
 
-	if cacheable && cachedResp != nil && err == nil {
-		if t.MarkCachedResponses {
-			cachedResp.Header.Set(XFromCache, "1")
-		}
+	if cachedResp != nil {
 		if t.EnableETagPair {
 			cachedXEtag, _ = getXETags(cachedResp.Header)
+		}
+	}
+
+	if cacheable && hasCachedResp && err == nil {
+		if t.MarkCachedResponses {
+			cachedResp.Header.Set(XFromCache, "1")
 		}
 
 		if varyMatches(cachedResp, req) {
@@ -247,16 +259,19 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 				t.Cache.Set(cacheKey, respBytes)
 			}
 		default:
-			var etagHash hash.Hash
+			var (
+				etagHash hash.Hash
+				etag1    = cachedXEtag
+				etag2    string
+			)
+
 			r := resp.Body
 			if t.EnableETagPair {
 				if etag := resp.Header.Get("etag"); etag != "" {
-					resp.Header.Set(XETag1, etag)
-					etag2 := cachedXEtag
+					etag1 = etag
 					if etag2 == "" {
 						etag2 = etag
 					}
-					resp.Header.Set(XETag2, etag2)
 				} else {
 					etagHash = md5.New()
 					r = struct {
@@ -274,17 +289,23 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 				OnEOF: func(r io.Reader) {
 					if etagHash != nil {
 						md5Str := hex.EncodeToString(etagHash.Sum(nil))
+						etag2 = md5Str
 						resp.Header.Set(XETag1, md5Str)
-						etag2 := cachedXEtag
-						if etag2 == "" {
-							etag2 = md5Str
+						resp.Header.Set(XETag2, md5Str)
+						if etag1 == "" {
+							etag1 = md5Str
 						}
-						resp.Header.Set(XETag2, etag2)
+					} else {
+						resp.Header.Set(XETag1, etag1)
+						resp.Header.Set(XETag2, etag1)
 					}
+
 					resp := *resp
 					resp.Body = io.NopCloser(r)
 					respBytes, err := httputil.DumpResponse(&resp, true)
 					if err == nil {
+						// Signal any change back to the caller.
+						resp.Header.Set(XETag1, etag1)
 						t.Cache.Set(cacheKey, respBytes)
 					}
 				},

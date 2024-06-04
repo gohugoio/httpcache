@@ -245,8 +245,9 @@ func TestEnableETagPair(t *testing.T) {
 	{
 		_, resp := doMethod(t, "GET", "/helloheaderasbody", map[string]string{"Hello": "world2"})
 		c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
-		c.Assert(resp.Header.Get(XETag1), qt.Equals, "61b7d44bc024f189195b549bf094fbe8")
-		c.Assert(resp.Header.Get(XETag2), qt.Equals, "48b21a691481958c34cc165011bdb9bc")
+		c.Assert(resp.Header.Get(XETag1), qt.Equals, "48b21a691481958c34cc165011bdb9bc")
+		c.Assert(resp.Header.Get(XETag2), qt.Equals, "61b7d44bc024f189195b549bf094fbe8")
+
 	}
 }
 
@@ -277,7 +278,6 @@ func TestShouldCache(t *testing.T) {
 	s.transport.AlwaysUseCachedResponse = func(req *http.Request, key string) bool {
 		return true
 	}
-
 	s.transport.ShouldCache = func(req *http.Request, resp *http.Response, key string) bool {
 		return req.Header.Get("Hello") == "world2"
 	}
@@ -292,6 +292,28 @@ func TestShouldCache(t *testing.T) {
 	{
 		s, _ := doMethod(t, "GET", "/helloheaderasbody", map[string]string{"Hello": "world3"})
 		c.Assert(s, qt.Equals, "world2")
+	}
+}
+
+func TestStaleCachedResponse(t *testing.T) {
+	resetTest()
+	s.transport.Cache = &staleCache{}
+	s.transport.AlwaysUseCachedResponse = func(req *http.Request, key string) bool {
+		return true
+	}
+	s.transport.EnableETagPair = true
+	c := qt.New(t)
+	{
+		_, resp := doMethod(t, "GET", "/helloheaderasbody", map[string]string{"Hello": "world1"})
+		c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
+		c.Assert(resp.Header.Get(XETag1), qt.Equals, "48b21a691481958c34cc165011bdb9bc")
+		c.Assert(resp.Header.Get(XETag2), qt.Equals, "48b21a691481958c34cc165011bdb9bc")
+	}
+	{
+		_, resp := doMethod(t, "GET", "/helloheaderasbody", map[string]string{"Hello": "world2"})
+		c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
+		c.Assert(resp.Header.Get(XETag1), qt.Equals, "48b21a691481958c34cc165011bdb9bc")
+		c.Assert(resp.Header.Get(XETag2), qt.Equals, "61b7d44bc024f189195b549bf094fbe8")
 	}
 }
 
@@ -1419,4 +1441,26 @@ func (c *memoryCache) Delete(key string) {
 	c.mu.Lock()
 	delete(c.items, key)
 	c.mu.Unlock()
+}
+
+var _ Cache = &staleCache{}
+
+type staleCache struct {
+	val []byte
+}
+
+func (c *staleCache) Get(key string) ([]byte, bool) {
+	return c.val, false
+}
+
+func (c *staleCache) Set(key string, resp []byte) {
+	c.val = resp
+}
+
+func (c *staleCache) Delete(key string) {
+	c.val = nil
+}
+
+func (c *staleCache) Size() int {
+	return 1
 }
