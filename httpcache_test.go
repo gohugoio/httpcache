@@ -180,8 +180,10 @@ func resetTest() {
 	s.transport.CacheKey = nil
 	s.transport.AlwaysUseCachedResponse = nil
 	s.transport.ShouldCache = nil
+	s.transport.CanStore = nil
 	s.transport.EnableETagPair = false
 	s.transport.MarkCachedResponses = false
+	s.transport.doInit()
 	clock = &realClock{}
 }
 

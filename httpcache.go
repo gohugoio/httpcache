@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -114,11 +115,36 @@ type Transport struct {
 	// ShouldCache is an optional func that when it returns false, the response will not be cached.
 	ShouldCache func(req *http.Request, resp *http.Response, key string) bool
 
+	// CanStore is an optional func that when set, is called to determine if a response
+	// can be stored in the cache.
+	// If not set, a default implementation is used that checks for 'no-store' in
+	// the request and response cache-control headers.
+	//
+	// Note that this does not imply that the response will be cached, only that it is
+	// allowed to be cached. The ShouldCache func is called after this to make the final decision.
+	CanStore func(reqCacheControl, respCacheControl CacheControl) (canStore bool)
+
 	// Around is an optional func.
 	// If set, the Transport will call Around at the start of RoundTrip
 	// and defer the returned func until the end of RoundTrip.
 	// Typically used to implement a lock that is held for the duration of the RoundTrip.
 	Around func(req *http.Request, key string) func()
+
+	init sync.Once
+}
+
+func (t *Transport) doInit() {
+	if t.Cache == nil {
+		panic("no Cache set on Transport")
+	}
+	if t.CanStore == nil {
+		t.CanStore = canStore
+	}
+	if t.ShouldCache == nil {
+		t.ShouldCache = func(req *http.Request, resp *http.Response, key string) bool {
+			return true
+		}
+	}
 }
 
 // varyMatches will return false unless all of the cached values for the headers listed in Vary
@@ -142,6 +168,10 @@ func varyMatches(cachedResp *http.Response, req *http.Request) bool {
 // to give the server a chance to respond with NotModified. If this happens, then the cached Response
 // will be returned.
 func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error) {
+	t.init.Do(func() {
+		t.doInit()
+	})
+
 	cacheKey := t.cacheKey(req)
 	if f := t.Around; f != nil {
 		defer f(req, cacheKey)()
@@ -243,7 +273,7 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 		}
 	}
 
-	if cacheable && (t.ShouldCache == nil || t.ShouldCache(req, resp, cacheKey)) && canStore(parseCacheControl(req.Header), parseCacheControl(resp.Header)) {
+	if cacheable && t.ShouldCache(req, resp, cacheKey) && t.CanStore(parseCacheControl(req.Header), parseCacheControl(resp.Header)) {
 		for _, varyKey := range headerAllCommaSepValues(resp.Header, "vary") {
 			varyKey = http.CanonicalHeaderKey(varyKey)
 			fakeHeader := "X-Varied-" + varyKey
@@ -513,7 +543,7 @@ func getEndToEndHeaders(respHeaders http.Header) []string {
 	return endToEndHeaders
 }
 
-func canStore(reqCacheControl, respCacheControl cacheControl) (canStore bool) {
+func canStore(reqCacheControl, respCacheControl CacheControl) (canStore bool) {
 	if _, ok := respCacheControl["no-store"]; ok {
 		return false
 	}
@@ -548,10 +578,11 @@ func cloneRequest(r *http.Request) *http.Request {
 	return r2
 }
 
-type cacheControl map[string]string
+// CacheControl is a map of the cache-control directives to their values (or "" if no value).
+type CacheControl map[string]string
 
-func parseCacheControl(headers http.Header) cacheControl {
-	cc := cacheControl{}
+func parseCacheControl(headers http.Header) CacheControl {
+	cc := CacheControl{}
 	ccHeader := headers.Get("Cache-Control")
 	for _, part := range strings.Split(ccHeader, ",") {
 		part = strings.Trim(part, " ")
