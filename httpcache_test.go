@@ -459,7 +459,7 @@ func TestGetNoStoreRequest(t *testing.T) {
 	resetTest()
 	s.transport.MarkCachedResponses = true
 	c := qt.New(t)
-	for i := 0; i < 2; i++ {
+	for range 2 {
 
 		_, resp := doMethod(t, "GET", "/", map[string]string{"cache-control": "no-store"})
 		c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
@@ -473,7 +473,7 @@ func TestGetNoStoreResponse(t *testing.T) {
 	resetTest()
 	s.transport.MarkCachedResponses = true
 	c := qt.New(t)
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		_, resp := doMethod(t, "GET", "/nostore", nil)
 		c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
 		c.Assert(resp.Header.Get(XFromCache), qt.Equals, "")
